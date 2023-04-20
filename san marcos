@@ -1,0 +1,52 @@
+library(zoo)
+library(xts)
+library(imputeTS)
+
+#set working directory
+path <- 'C:/Users/alg-1/OneDrive/Documentos/Machinelearning/'
+setwd(path)
+getwd()
+
+#read in data
+c <- read.csv('sanmarcoss.csv')
+head(c)
+c$date <- as.Date(c$date)
+
+#Extract begin and end
+bgn <- as.Date(c$date[1],format='%Y/%m/%d')
+end <- as.Date(c$date[length(c$date)],format='%Y/%m/%d')
+datex <- seq.Date(bgn,end,"day")
+pdatex <- as.Date(c$date,format='%Y/%m/%d')
+
+#Check to see if there are missing values
+theo <- length(datex)
+actu <- length(c$date)
+if(theo > actu)print("missing value")
+
+#create a zoo object
+Dsm.zoo <- zoo(c$Discharge,pdatex)
+dumsm.zoo <-zoo(,datex) #Dummy dataset with time alone
+Dsm.zoom <- merge(dumsm.zoo,Dsm.zoo)
+plot(Dsm.zoom,xlab='Year',ylab='Discharge(cfs)') #see if there are any visible periods of missing records
+summary(Dsm.zoom) #check how many NAs
+
+#interpolate for missing discharge values
+Dsm.ts <- as.ts(Dsm.zoom) #convert to ts object of base R
+Dsm.tsf <- na_kalman(Dsm.ts,model= "StructTS") #perform imputation
+Dsm.zoof <- zoo(Dsm.tsf,datex) #convert back to
+plot(Dsm.zoof,xlab='Year',ylab='Discharge(cfs)') #see if there are any visible periods of missing records
+summary(Dsm.zoof)
+
+#perform 10-day moving average
+Dsm10d <- rollmean(Dsm.zoof,10,align='right')
+plot(Dsm10d,xlab='Year',ylab='Discharge(cfs)') #see if there are any visible periods of missing records
+summary(Dsm10d)
+
+#aggregate to monthly values using mean
+Dsmmon <- apply.monthly(as.xts(Dsm.zoof),mean) #function in xts
+plot(Dsmmon,xlab='Year',ylab='Discharge(cfs)') #see if there are any visible periods of missing records
+summary(Dsmmon)
+
+#calculate autocorrelation 
+acf(Dsm.zoof,lag.max=NULL,main='ACF for San Marcos', type = c('correlation'))
+pacf(Dsm.zoof,main='P.Auto.Cor.Fun San MArcos',type="o")
