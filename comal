@@ -1,0 +1,52 @@
+library(zoo)
+library(xts)
+library(imputeTS)
+
+#set working directory
+path <- 'C:/Users/alg-1/OneDrive/Documentos/Machinelearning/'
+setwd(path)
+getwd()
+
+#read in data
+b <- read.csv('comall.csv')
+head(b)
+b$date <- as.Date(b$date)
+
+#Extract begin and end
+bgn <- as.Date(b$date[1],format='%Y/%m/%d')
+end <- as.Date(b$date[length(b$date)],format='%Y/%m/%d')
+datex <- seq.Date(bgn,end,"day")
+pdatex <- as.Date(b$date,format='%Y/%m/%d')
+
+#Check to see if there are missing values
+theo <- length(datex)
+actu <- length(b$date)
+if(theo > actu)print("missing value")
+
+#create a zoo object
+Dc.zoo <- zoo(b$Discharge,pdatex)
+dumc.zoo <-zoo(,datex) #Dummy dataset with time alone
+Dc.zoom <- merge(dumc.zoo,Dc.zoo)
+plot(Dc.zoom,xlab='Year',ylab='Discharge(cfs)') #see if there are any visible periods of missing records
+summary(Dc.zoom) #check how many NAs
+
+#interpolate for missing discharge values
+Dc.ts <- as.ts(Dc.zoom) #convert to ts object of base R
+Dc.tsf <- na_kalman(Dc.ts,model= "StructTS") #perform imputation
+Dc.zoof <- zoo(Dc.tsf,datex) #convert back to
+plot(Dc.zoof,xlab='Year',ylab='Discharge(cfs)') #see if there are any visible periods of missing records
+summary(Dc.zoof)
+
+#perform 10-day moving average
+Dc10d <- rollmean(Dc.zoof,10,align='right')
+plot(Dc10d,xlab='Year',ylab='Discharge(cfs)') #see if there are any visible periods of missing records
+summary(Dc10d)
+
+#aggregate to monthly values using mean
+Dcmon <- apply.monthly(as.xts(Dc.zoof),mean) #function in xts
+plot(Dcmon,xlab='Year',ylab='Discharge(cfs)') #see if there are any visible periods of missing records
+summary(Dcmon)
+
+#calculate autocorrelation 
+acf(Dc.zoof,lag.max=NULL,main='ACF for Comal', type = c('correlation'))
+pacf(Dc.zoof,main='P.Auto.Cor.Fun Comal',type="o")
